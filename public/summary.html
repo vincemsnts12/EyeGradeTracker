@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>EyeGradeTracker Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- ADDED: Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Plus Jakarta Sans', sans-serif; } </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+    <!-- MODERN NAV -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                 <div class="bg-red-900 text-white p-1.5 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                 </div>
+                <h1 class="text-lg font-bold text-black tracking-tight">EyeGradeTracker</h1>
+            </div>
+            <div class="flex gap-2 text-sm font-semibold">
+                <!-- UPDATED: Removed Graphs Link -->
+                <a href="summary.html" class="px-4 py-2 bg-red-50 text-red-900 rounded-lg">Dashboard</a>
+                <a href="flashcards.html" class="px-4 py-2 text-gray-500 hover:text-red-900 hover:bg-gray-50 rounded-lg transition">Flashcards</a>
+                <a href="assessment.html" class="px-4 py-2 text-gray-500 hover:text-red-900 hover:bg-gray-50 rounded-lg transition">Assessment</a>
+                <a href="settings.html" class="px-4 py-2 text-gray-500 hover:text-red-900 hover:bg-gray-50 rounded-lg transition">Settings</a> 
+                <button onclick="logout()" class="ml-4 px-4 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition shadow-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+    
+    <div id="checkupAlert" class="hidden bg-yellow-50 border-b border-yellow-200 px-6 py-3">
+        <div class="container mx-auto flex justify-between items-center text-yellow-800 text-sm font-bold">
+            <span class="flex items-center gap-2 text-black">
+                <svg class="w-5 h-5" fill="yellow" viewBox="0 0 24 24" stroke="black"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                 ACTION REQUIRED: Your next eye checkup is PAST DUE!
+            </span>
+            <button onclick="closeAlert()" class="p-1 hover:bg-red-100 rounded-full transition leading-none">
+                Dismiss
+            </button>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-6 max-w-5xl space-y-6">
+        
+        <!-- INPUT SECTION -->
+        <div class="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-900 to-red-700"></div>
+            <h2 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                Add New Prescription
+            </h2>
+            <form id="addForm" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Date</label>
+                    <input type="date" id="date" class="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-900 focus:bg-white transition" required>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Left Eye (OS)</label>
+                    <input type="number" step="0.25" id="left" class="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-900 focus:bg-white transition" required>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 block">Right Eye (OD)</label>
+                    <input type="number" step="0.25" id="right" class="w-full bg-gray-50 border border-gray-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-900 focus:bg-white transition" required>
+                </div>
+                <button type="submit" class="bg-red-900 text-white py-2.5 px-4 rounded-lg hover:bg-red-800 transition font-bold shadow-md h-[45px]">Save</button>
+            </form>
+            <input type="text" id="notes" placeholder="Optional notes (e.g., blurred vision)" class="w-full mt-3 bg-gray-50 border border-gray-200 p-2.5 rounded-lg focus:outline-none focus:ring-1 focus:ring-red-900 text-sm">
+        </div>
+
+        <!-- STATS CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+                <h3 class="font-bold text-gray-400 text-xs uppercase tracking-widest">Current Status</h3>
+                <div class="flex justify-between mt-4 px-4">
+                    <div class="text-center">
+                        <span class="block text-4xl font-extrabold text-gray-800" id="curLeft">--</span>
+                        <span class="text-xs font-bold text-black-900 bg-red-200 px-2 py-1 rounded mt-1 inline-block">Left Eye</span>
+                    </div>
+                    <div class="w-px bg-gray-100 h-12"></div>
+                    <div class="text-center">
+                        <span class="block text-4xl font-extrabold text-gray-800" id="curRight">--</span>
+                        <span class="text-xs font-bold text-black-900 bg-yellow-200 px-2 py-1 rounded mt-1 inline-block">Right Eye</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-md border border-gray-100 flex flex-col justify-center">
+                <h3 class="font-bold text-gray-400 text-xs uppercase tracking-widest">Next Checkup</h3>
+                <div class="mt-2">
+                    <p class="text-3xl font-bold text-black-900" id="nextCheckup">--/--/----</p>
+                    <p class="text-xs text-gray-400 mt-1 font-medium">Recommended 6 months from last entry</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- NEW: CHART SECTION INTEGRATED HERE -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 relative overflow-hidden">
+            <!-- Adjusted styling to match other cards -->
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-yellow-500 to-yellow-300"></div>
+            <h2 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                Prescription Progression
+            </h2>
+            <div class="relative h-80 w-full">
+                <canvas id="gradeChart"></canvas>
+            </div>
+        </div>
+
+        <!-- TABLE -->
+        <div class="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+            <table class="w-full text-left">
+                <thead class="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                        <th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Left</th>
+                        <th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Right</th>
+                        <th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Notes</th>
+                        <th class="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider text-center">Action</th> 
+                    </tr>
+                </thead>
+                <tbody id="historyBody" class="divide-y divide-gray-50"></tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script src="js/app.js"></script>
+    <script>
+        checkAuth();
+        
+        // --- GLOBAL CHART VARIABLE ---
+        let myChartInstance = null;
+
+        function closeAlert() {
+            document.getElementById('checkupAlert').classList.add('hidden');
+        }
+        
+        async function loadData() {
+            try {
+                const res = await fetch(`${API_URL}/prescriptions`, { headers: getHeaders() });
+                const data = await res.json();
+                
+                const tbody = document.getElementById('historyBody');
+                tbody.innerHTML = '';
+                
+                const checkupAlert = document.getElementById('checkupAlert'); 
+
+                if(data.length > 0) {
+                    const latest = data[data.length - 1];
+                    document.getElementById('curLeft').innerText = latest.left_eye;
+                    document.getElementById('curRight').innerText = latest.right_eye;
+
+                    const lastDate = new Date(latest.checkup_date);
+                    const nextCheckupDate = new Date(lastDate);
+                    nextCheckupDate.setMonth(lastDate.getMonth() + 6);
+                    
+                    document.getElementById('nextCheckup').innerText = nextCheckupDate.toLocaleDateString();
+
+                    // Pop-up Logic
+                    const today = new Date();
+                    const nextCheckupMidnight = new Date(nextCheckupDate.getFullYear(), nextCheckupDate.getMonth(), nextCheckupDate.getDate());
+                    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+                    if (nextCheckupMidnight <= todayMidnight) {
+                        checkupAlert.classList.remove('hidden');
+                    } else {
+                        checkupAlert.classList.add('hidden');
+                    }
+
+                    // --- RENDER CHART (New Logic) ---
+                    renderChart(data);
+
+                    // Table Population
+                    [...data].reverse().forEach(row => {
+                         tbody.innerHTML += `
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="p-4 text-sm font-medium text-gray-900">${new Date(row.checkup_date).toLocaleDateString()}</td>
+                                <td class="p-4 text-sm font-bold text-gray-700">${row.left_eye}</td>
+                                <td class="p-4 text-sm font-bold text-gray-700">${row.right_eye}</td>
+                                <td class="p-4 text-sm text-gray-500 italic">${row.notes || '-'}</td>
+                                <td class="p-4 text-center">
+                                    <button onclick="deleteEntry('${row.id}')" class="text-gray-400 hover:text-red-900 font-bold p-2 hover:bg-red-50 rounded-full transition">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                } else {
+                    document.getElementById('curLeft').innerText = "--";
+                    document.getElementById('curRight').innerText = "--";
+                    document.getElementById('nextCheckup').innerText = "--/--/----";
+                    checkupAlert.classList.add('hidden');
+                    
+                    // Clear chart if no data
+                    if(myChartInstance) {
+                        myChartInstance.destroy();
+                        myChartInstance = null;
+                    }
+                }
+            } catch (err) {
+                console.error("Error loading data:", err);
+            }
+        }
+
+        // --- NEW FUNCTION TO RENDER CHART ---
+        function renderChart(data) {
+            const ctx = document.getElementById('gradeChart').getContext('2d');
+            
+            // Format data for chart
+            const labels = data.map(d => new Date(d.checkup_date).toLocaleDateString());
+            const leftData = data.map(d => d.left_eye);
+            const rightData = data.map(d => d.right_eye);
+
+            // Destroy existing chart to prevent overlap/errors
+            if (myChartInstance) {
+                myChartInstance.destroy();
+            }
+
+            myChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: 'Left Eye', data: leftData, borderColor: '#7f1d1d', tension: 0.3, pointBackgroundColor: '#7f1d1d' },
+                        { label: 'Right Eye', data: rightData, borderColor: '#F2C21F', tension: 0.3, pointBackgroundColor: '#F2C21F' }
+                    ]
+                },
+                options: { 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            grid: { color: '#f3f4f6' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    },
+                    plugins: {
+                        legend: { position: 'bottom' }
+                    }
+                }
+            });
+        }
+
+        async function deleteEntry(id) {
+            if(!confirm("Are you sure you want to delete this record?")) return;
+
+            try {
+                const res = await fetch(`${API_URL}/prescriptions/${id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders()
+                });
+
+                if (res.ok) {
+                    loadData(); // This will now reload table AND chart
+                } else {
+                    alert("Failed to delete record.");
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Error connecting to server.");
+            }
+        }
+
+        document.getElementById('addForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const body = {
+                left: document.getElementById('left').value,
+                right: document.getElementById('right').value,
+                notes: document.getElementById('notes').value,
+                date: document.getElementById('date').value
+            };
+
+            await fetch(`${API_URL}/prescriptions`, {
+                method: 'POST',
+                headers: getHeaders(),
+                body: JSON.stringify(body)
+            });
+            
+            document.getElementById('addForm').reset();
+            loadData(); // This will now reload table AND chart
+        });
+
+        loadData();
+    </script>
+</body>
+</html>

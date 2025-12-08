@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Account Settings</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style> body { font-family: 'Plus Jakarta Sans', sans-serif; } </style>
+</head>
+<body class="bg-gray-50 font-sans flex flex-col min-h-screen">
+
+    <!-- UPDATED NAV: Removed 'Graphs', Renamed 'Summary' to 'Dashboard' -->
+    <nav class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-2">
+                 <div class="bg-red-900 text-white p-1.5 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                 </div>
+                <h1 class="text-lg font-bold text-black tracking-tight">EyeGradeTracker</h1>
+            </div>
+            <div class="flex gap-2 text-sm font-semibold">
+                <a href="summary.html" class="px-4 py-2 text-gray-500 hover:text-red-900 hover:bg-gray-50 rounded-lg transition">Dashboard</a>
+                <a href="flashcards.html" class="px-4 py-2 text-gray-500 hover:text-red-900 hover:bg-gray-50 rounded-lg transition">Flashcards</a>
+                <a href="assessment.html" class="px-4 py-2 text-gray-500 hover:text-red-900 hover:bg-gray-50 rounded-lg transition">Assessment</a>
+                <a href="settings.html" class="px-4 py-2 bg-red-50 text-red-900 rounded-lg">Settings</a> 
+                <button onclick="logout()" class="ml-4 px-4 py-2 bg-red-900 text-white rounded-lg hover:bg-red-800 transition shadow-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex-grow container mx-auto p-6 max-w-2xl mt-8">
+        <!-- Header Sizing matched to Assessment/Flashcards -->
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-black mb-1">Account Settings</h1>
+            <p class="text-gray-500 text-sm">Manage your password and security preferences.</p>
+        </div>
+        
+        <p id="statusMsg" class="text-sm font-bold text-center mb-6 hidden p-3 rounded-lg"></p>
+
+        <!-- PASSWORD SECTION (Fixed red border) -->
+        <section class="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 mb-8 relative overflow-hidden">
+            <!-- Left Border Strip changed to Red-900 for consistency -->
+            <div class="absolute top-0 left-0 w-1.5 h-full bg-red-900"></div>
+            
+            <h2 class="text-lg font-bold text-gray-800 mb-6">Change Password</h2>
+            <div class="space-y-5">
+                <div>
+                    <input type="password" id="currentPassword" placeholder="Current Password" 
+                           class="w-full bg-gray-50 border border-gray-200 p-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-900 focus:bg-white transition text-sm">
+                </div>
+                <div>
+                    <input type="password" id="newPassword" placeholder="New Password (min 6 chars)" 
+                           class="w-full bg-gray-50 border border-gray-200 p-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-900 focus:bg-white transition text-sm">
+                </div>
+                <div>
+                    <input type="password" id="confirmNewPassword" placeholder="Confirm New Password" 
+                           class="w-full bg-gray-50 border border-gray-200 p-3.5 rounded-xl focus:outline-none focus:ring-1 focus:ring-red-900 focus:bg-white transition text-sm">
+                </div>
+                
+                <p id="passwordError" class="text-red-600 text-xs hidden font-bold bg-red-50 p-2 rounded"></p>
+                <div class="flex justify-end">
+                    <button id="changePassBtn" disabled class="bg-red-900 text-white py-3 px-6 rounded-xl hover:bg-red-800 transition font-bold disabled:opacity-50 disabled:cursor-not-allowed shadow-md text-sm">
+                        Update Password
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- DANGER ZONE -->
+        <section class="bg-red-50 p-8 rounded-2xl border border-red-100 relative overflow-hidden">
+            <h2 class="text-lg font-bold text-red-900 mb-3">Danger Zone</h2>
+            <p class="text-sm text-red-800 mb-6 opacity-80 leading-relaxed">Permanently delete your account and all associated data. This action cannot be undone.</p>
+            <div class="flex justify-end">
+                <button id="deleteAccountBtn" class="bg-white border border-red-200 text-red-600 py-3 px-6 rounded-xl hover:bg-red-600 hover:text-white transition font-bold shadow-sm text-sm">
+                    Delete My Account
+                </button>
+            </div>
+        </section>
+
+    </div>
+    
+    <!-- MODALS (Unchanged logic) -->
+    <div id="passConfirmModal" style="display: none;" class="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full">
+            <h3 class="text-lg font-bold mb-3 text-gray-800">Confirm Change</h3>
+            <p class="mb-6 text-sm text-gray-600">You will be logged out after changing your password. Please sign in again with your new password.</p>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('passConfirmModal')" class="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition text-sm">Cancel</button>
+                <button id="confirmPassBtn" class="bg-red-900 text-white px-4 py-2 rounded-lg font-bold hover:bg-red-800 transition text-sm">Confirm</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="deleteConfirmModal" style="display: none;" class="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full border-t-4 border-red-600">
+            <h3 class="text-lg font-bold text-red-600 mb-3">Final Warning</h3>
+            <p class="mb-4 text-sm text-gray-600">Type <strong class="text-red-900">DELETE</strong> to permanently remove your account.</p>
+            <input type="text" id="deleteConfirmText" placeholder="Type DELETE" class="w-full border p-3 rounded-lg mb-6 focus:border-red-600 focus:outline-none text-sm">
+            <div class="flex justify-end gap-3">
+                <button onclick="closeModal('deleteConfirmModal')" class="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg font-bold hover:bg-gray-200 transition text-sm">Cancel</button>
+                <button id="confirmDeleteBtn" disabled class="bg-red-300 text-white px-4 py-2 rounded-lg font-bold cursor-not-allowed transition text-sm">
+                    Permanently Delete
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script> 
+    <script>
+        checkAuth();
+        const statusMsg = document.getElementById('statusMsg');
+        const currentPassInput = document.getElementById('currentPassword');
+        const newPassInput = document.getElementById('newPassword');
+        const confirmNewPassInput = document.getElementById('confirmNewPassword');
+        const changePassBtn = document.getElementById('changePassBtn');
+        const deleteAccountBtn = document.getElementById('deleteAccountBtn');
+        const passConfirmModal = document.getElementById('passConfirmModal');
+        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+        const confirmPassBtn = document.getElementById('confirmPassBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const deleteConfirmText = document.getElementById('deleteConfirmText');
+        const passError = document.getElementById('passwordError');
+        const userDetails = JSON.parse(localStorage.getItem('eye_user'));
+
+        function closeModal(id) { document.getElementById(id).style.display = 'none'; }
+        function showStatus(message, isError = false) {
+            statusMsg.textContent = message;
+            statusMsg.className = isError 
+                ? 'text-red-700 bg-red-100 border border-red-200 p-3 rounded-lg block font-bold mb-6' 
+                : 'text-green-700 bg-green-100 border border-green-200 p-3 rounded-lg block font-bold mb-6';
+            statusMsg.classList.remove('hidden');
+        }
+
+        [currentPassInput, newPassInput, confirmNewPassInput].forEach(input => {
+            input.addEventListener('input', () => {
+                const isMatch = newPassInput.value === confirmNewPassInput.value && newPassInput.value.length >= 6;
+                const currentFilled = currentPassInput.value.length > 0;
+                passError.classList.add('hidden');
+                
+                if (!currentFilled) { passError.textContent = "Enter current password."; passError.classList.remove('hidden'); } 
+                else if (newPassInput.value.length < 6 && newPassInput.value.length > 0) { passError.textContent = "Min 6 characters."; passError.classList.remove('hidden'); } 
+                else if (newPassInput.value !== confirmNewPassInput.value && confirmNewPassInput.value.length > 0) { passError.textContent = "Passwords do not match."; passError.classList.remove('hidden'); }
+                
+                changePassBtn.disabled = !(isMatch && currentFilled);
+            });
+        });
+
+        changePassBtn.addEventListener('click', () => { passConfirmModal.style.display = 'flex'; });
+
+        confirmPassBtn.addEventListener('click', async () => {
+            closeModal('passConfirmModal');
+            changePassBtn.innerText = 'Updating...'; changePassBtn.disabled = true; statusMsg.classList.add('hidden');
+            const newPassword = newPassInput.value; const currentPassword = currentPassInput.value;
+
+            const { error: reauthError } = await supabase.auth.signInWithPassword({ email: userDetails.email, password: currentPassword });
+
+            if (reauthError) {
+                showStatus('Incorrect current password.', true);
+                changePassBtn.innerText = 'Update Password'; changePassBtn.disabled = true; currentPassInput.value = ''; return;
+            }
+            
+            const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+            if (updateError) { showStatus(`Error: ${updateError.message}`, true); } 
+            else { showStatus('Password updated! Please log in again.', false); setTimeout(logout, 2000); }
+            changePassBtn.innerText = 'Update Password'; changePassBtn.disabled = false;
+        });
+        
+        deleteAccountBtn.addEventListener('click', () => { deleteConfirmModal.style.display = 'flex'; });
+        
+        deleteConfirmText.addEventListener('input', () => {
+            const isMatch = deleteConfirmText.value.trim() === 'DELETE';
+            confirmDeleteBtn.disabled = !isMatch;
+            confirmDeleteBtn.className = isMatch ? "bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition font-bold text-sm" : "bg-red-300 text-white px-4 py-2 rounded-lg cursor-not-allowed font-bold text-sm";
+        });
+
+        confirmDeleteBtn.addEventListener('click', async () => {
+            closeModal('deleteConfirmModal');
+            deleteAccountBtn.innerText = 'Deleting...'; deleteAccountBtn.disabled = true;
+            const apiUrl = 'http://localhost:3000/api/user/delete-account';
+            
+            try {
+                const response = await fetch(apiUrl, { method: 'DELETE', headers: getHeaders() });
+                if (response.ok) { showStatus('Account deleted.', false); setTimeout(logout, 2000); } 
+                else { const data = await response.json(); showStatus(`Failed: ${data.error}`, true); }
+            } catch (e) { showStatus('Network error.', true); }
+            deleteAccountBtn.innerText = 'Delete My Account'; deleteAccountBtn.disabled = false;
+        });
+    </script>
+</body>
+</html>
