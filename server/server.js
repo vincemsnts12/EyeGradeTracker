@@ -19,24 +19,9 @@ app.use(cors({
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
-// --- SCHEDULER LOGIC ---
-
-// CHANGED: Removed Transporter/Nodemailer Setup completely.
-// We now use a helper function that calls the EmailJS REST API.
-
-// Helper function to send the reminder email via EmailJS
 async function sendReminderEmail(email, nextCheckupDate) {
     console.log(`[EMAILJS] Preparing email for: ${email}`);
     
-    // --- DEBUG LOGS (Burahin mo ito pag gumana na) ---
-    console.log("Check Env Vars:");
-    console.log("Service ID:", process.env.EMAILJS_SERVICE_ID);
-    console.log("Template ID:", process.env.EMAILJS_TEMPLATE_ID);
-    console.log("Public Key:", process.env.EMAILJS_PUBLIC_KEY);
-    console.log("Private Key exists?:", !!process.env.EMAILJS_PRIVATE_KEY); // Dapat TRUE
-    // ------------------------------------------------
-
-    // Your HTML content remains exactly the same
     const emailHtmlContent = `
         <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
             <h2 style="color: #000000ff; border-bottom: 2px solid #000000ff; padding-bottom: 10px;">Essential Eye Checkup Reminder</h2>
@@ -72,7 +57,7 @@ async function sendReminderEmail(email, nextCheckupDate) {
         service_id: process.env.EMAILJS_SERVICE_ID,
         template_id: process.env.EMAILJS_TEMPLATE_ID,
         user_id: process.env.EMAILJS_PUBLIC_KEY,
-        accessToken: process.env.EMAILJS_PRIVATE_KEY, // Required for secure server-side sending
+        accessToken: process.env.EMAILJS_PRIVATE_KEY, 
         template_params: {
             to_email: email,             
             message_html: emailHtmlContent, 
@@ -94,7 +79,6 @@ async function sendReminderEmail(email, nextCheckupDate) {
 async function checkAndSendReminders() {
     console.log(`[DEBUG] 1. Cron Job Started at ${new Date().toISOString()}`);
     
-    // 1. IMPORTANT: Idagdag ang 'id' sa select para may unique identifier tayo pang-update
     const { data: prescriptions, error: dbError } = await supabase
         .from('prescriptions')
         .select('id, user_id, checkup_date'); 
@@ -134,14 +118,10 @@ async function checkAndSendReminders() {
             if (success) {
                 console.log(`        -> SUCCESS: Email sent to ${userEmail}`);
                 
-                // --- CRITICAL FIX: UPDATE DATABASE ---
-                // Ilipat ang date sa susunod na 6 months (o kahit anong logic mo)
-                // para hindi na siya ma-detect na "Overdue" sa susunod na run.
                 const { error: updateError } = await supabase
                     .from('prescriptions')
-                    .update({ checkup_date: nextCheckup.toISOString() }) // Move date forward
-                    .eq('id', entry.id); // Gamitin ang ID ng prescription
-
+                    .update({ checkup_date: nextCheckup.toISOString() }) 
+                    .eq('id', entry.id); 
                 if (updateError) {
                     console.error("        -> DB ERROR: Failed to update checkup date", updateError);
                 } else {
@@ -155,7 +135,7 @@ async function checkAndSendReminders() {
     }
 }
 
-// Temporary: Run every minute para ma-test agad
+
 cron.schedule('* * * * *', checkAndSendReminders);
 
 // --- Middleware to Verify User via Header ---
@@ -330,6 +310,35 @@ app.post('/api/send-reminder', requireAuth, async (req, res) => {
     }
 
     res.json({ success: true, message: 'Reminder email sent successfully.' });
+});
+
+// 10. Get User Profile
+app.get('/api/profile', requireAuth, async (req, res) => {
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', req.user.id)
+        .single();
+
+    if (error) {
+        console.error("Profile Fetch Error:", error);
+        return res.status(500).json({ error: error.message });
+    }
+    res.json(data);
+});
+
+// 11. Update User Profile (NAME & STUDENT NUMBER ONLY)
+app.put('/api/profile', requireAuth, async (req, res) => {
+    // Kuhanin lang ang Name at Student Number. IGNORE ang Section.
+    const { full_name, student_number } = req.body;
+
+    const { error } = await supabase
+        .from('profiles')
+        .update({ full_name, student_number }) // Update specific fields only
+        .eq('id', req.user.id);
+
+    if (error) return res.status(500).json({ error: error.message });
+    res.json({ message: "Profile updated successfully" });
 });
 
 
