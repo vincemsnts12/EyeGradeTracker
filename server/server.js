@@ -22,18 +22,18 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // --- SCHEDULER LOGIC ---
 const transporter = nodemailer.createTransport({
     host: 'smtp.gmail.com',
-    port: 465, // Balik sa SSL Port
-    secure: true, // Dapat TRUE pag port 465
+    port: 587,              // Use Port 587 instead of 465
+    secure: false,          // False for Port 587 (uses STARTTLS)
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
     },
     tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false // Fixes SSL certificate issues
     },
-    family: 4, // Force IPv4
-    logger: true, // Dagdag logs
-    debug: true   // Dagdag debug info
+    family: 4, // Forces IPv4 (Fixes ETIMEDOUT on Render)
+    logger: true,
+    debug: true
 });
 
 // Verify connection configuration
