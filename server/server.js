@@ -2,149 +2,155 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
-const { Resend } = require('resend'); // IMPORT RESEND
 const path = require('path');
 const cron = require('node-cron'); 
+const axios = require('axios'); // CHANGED: Replaced nodemailer with axios
 
 const app = express();
 app.use(express.json());
 
-// Allow Vercel Frontend
 app.use(cors({
     origin: 'https://eye-grade-tracker.vercel.app', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'user-id', 'user-email']
 }));
 
-// --- CONFIGURATION ---
+//app.use(express.static(path.join(__dirname, '..', 'public')));
 
-// Initialize Resend
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-// Initialize Supabase
-// IMPORTANT: process.env.SUPABASE_KEY must be your SERVICE ROLE KEY (Secret) 
-// for the Cron Job to have permission to search users.
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// --- SCHEDULER LOGIC ---
 
-// --- EMAIL LOGIC VIA RESEND ---
+// CHANGED: Removed Transporter/Nodemailer Setup completely.
+// We now use a helper function that calls the EmailJS REST API.
+
+// Helper function to send the reminder email via EmailJS
 async function sendReminderEmail(email, nextCheckupDate) {
-    console.log(`[RESEND] Preparing email for: ${email}`);
+    console.log(`[EMAILJS] Preparing email for: ${email}`);
+
+    // Your HTML content remains exactly the same
+    const emailHtmlContent = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
+            <h2 style="color: #000000ff; border-bottom: 2px solid #000000ff; padding-bottom: 10px;">Essential Eye Checkup Reminder</h2>
+            
+            <p>Dear Valued User,</p>
+            
+            <p>This is an automated notification from **EyeGradeTracker** regarding your eye care schedule.</p>
+            
+            <p>Based on your last prescription record, your recommended 6-month checkup was due on or before:</p>
+            
+            <h3 style="color: #d9534f; background-color: #f9f9f9; padding: 10px; border-radius: 5px; text-align: center;">${nextCheckupDate}</h3>
+            
+            <p><strong>Maintaining Regular Checkups is Crucial:</strong> Timely visits help detect potential issues early, especially for prolonged screen use common in academic settings.</p>
+            
+            <p style="margin-top: 20px;">
+                We strongly urge you to **schedule an appointment** with your eye care professional as soon as possible.
+            </p>
+            
+            <hr style="border-top: 1px solid #eee; margin: 20px 0;">
+            
+            <p style="font-size: 0.9em; color: #777;">
+                *Please remember to update your prescription details within the EyeGradeTracker application after your visit.*
+            </p>
+            <p style="font-size: 0.9em; color: #777;">
+                Best regards,<br>
+                Eye Grade Tracker Admin
+            </p>
+        </div>
+    `;
+
+    // CHANGED: Construct EmailJS Payload
+    const data = {
+        service_id: process.env.EMAILJS_SERVICE_ID,
+        template_id: process.env.EMAILJS_TEMPLATE_ID,
+        user_id: process.env.EMAILJS_PUBLIC_KEY,
+        accessToken: process.env.EMAILJS_PRIVATE_KEY, // Required for secure server-side sending
+        template_params: {
+            to_email: email,             
+            message_html: emailHtmlContent, 
+            subject: 'Action Required: Your Eye Checkup is Overdue - EyeGradeTracker'
+        }
+    };
 
     try {
-        const data = await resend.emails.send({
-            from: 'EyeGradeTracker <onboarding@resend.dev>', // MUST use this default sender on Free Tier
-            to: [email], // On Free Tier, this MUST be your verified email address
-            subject: 'Action Required: Your Eye Checkup is Overdue',
-            html: `
-            <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: auto; border: 1px solid #ddd; padding: 20px;">
-                <h2 style="color: #000000ff; border-bottom: 2px solid #000000ff; padding-bottom: 10px;">Essential Eye Checkup Reminder</h2>
-                
-                <p>Dear Valued User,</p>
-                
-                <p>This is an automated notification from **EyeGradeTracker** regarding your eye care schedule.</p>
-                
-                <p>Based on your last prescription record, your recommended 6-month checkup was due on or before:</p>
-                
-                <h3 style="color: #d9534f; background-color: #f9f9f9; padding: 10px; border-radius: 5px; text-align: center;">${nextCheckupDate}</h3>
-                
-                <p><strong>Maintaining Regular Checkups is Crucial:</strong> Timely visits help detect potential issues early, especially for prolonged screen use common in academic settings.</p>
-                
-                <p style="margin-top: 20px;">
-                    We strongly urge you to **schedule an appointment** with your eye care professional as soon as possible.
-                </p>
-                
-                <hr style="border-top: 1px solid #eee; margin: 20px 0;">
-                
-                <p style="font-size: 0.9em; color: #777;">
-                    *Please remember to update your prescription details within the EyeGradeTracker application after your visit.*
-                </p>
-                <p style="font-size: 0.9em; color: #777;">
-                    Best regards,<br>
-                    Eye Grade Tracker Admin
-                </p>
-            </div>
-            `
-        });
-
-        if (data.error) {
-            console.error('[RESEND FAILED]', data.error);
-            return false;
-        }
-
-        console.log(`[RESEND SUCCESS] Email ID: ${data.data.id}`);
+        // CHANGED: Send POST request to EmailJS API
+        const response = await axios.post('https://api.emailjs.com/api/v1.0/email/send', data);
+        console.log(`[EMAILJS SUCCESS] Status: ${response.status}`);
         return true;
-
     } catch (error) {
-        console.error('[RESEND ERROR] Exception:', error);
+        console.error(`[EMAILJS FAILED] Error:`, error.response ? error.response.data : error.message);
         return false;
     }
 }
 
-// --- CRON JOB (SCHEDULER) ---
 async function checkAndSendReminders() {
     console.log(`[DEBUG] 1. Cron Job Started at ${new Date().toISOString()}`);
     
-    // Check Database Connection & Data
+    // 1. IMPORTANT: Idagdag ang 'id' sa select para may unique identifier tayo pang-update
     const { data: prescriptions, error: dbError } = await supabase
         .from('prescriptions')
-        .select('user_id, checkup_date');
+        .select('id, user_id, checkup_date'); 
 
     if (dbError) {
         console.error("[DEBUG] ERROR: Database Fetch Failed:", dbError);
         return;
     }
 
-    console.log(`[DEBUG] 2. Found ${prescriptions.length} prescriptions in DB.`);
-
-    if (!prescriptions || prescriptions.length === 0) {
-        console.log("[DEBUG] Stopping. No prescriptions to check.");
-        return;
-    }
+    if (prescriptions.length === 0) return;
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Reset time to midnight
+    today.setHours(0, 0, 0, 0); 
 
     for (const entry of prescriptions) {
-        // Log details of each entry being checked
         const lastCheckupDate = new Date(entry.checkup_date);
         const nextCheckup = new Date(lastCheckupDate);
         nextCheckup.setMonth(lastCheckupDate.getMonth() + 6); 
         nextCheckup.setHours(0, 0, 0, 0);
 
-        console.log(`[DEBUG] Checking User: ${entry.user_id}`);
-        console.log(`        - Last Checkup: ${lastCheckupDate.toLocaleDateString()}`);
-        console.log(`        - Due Date: ${nextCheckup.toLocaleDateString()}`);
-        console.log(`        - Today: ${today.toLocaleDateString()}`);
-
         if (nextCheckup.getTime() <= today.getTime()) {
-            console.log(`        -> STATUS: OVERDUE! Attempting to fetch email...`);
+            console.log(`        -> STATUS: OVERDUE! User: ${entry.user_id}`);
             
-            // NOTE: This requires the SUPABASE_KEY env var to be the SERVICE ROLE KEY
+            // Fetch User Email
             const { data: user, error: userFetchError } = await supabase.auth.admin.getUserById(entry.user_id);
             
             if (userFetchError || !user || !user.user) {
-                console.error(`        -> ERROR: User Fetch Failed for ID: ${entry.user_id}`, userFetchError);
+                console.error(`        -> ERROR: User Fetch Failed`);
                 continue;
             }
             
             const userEmail = user.user.email;
-            console.log(`        -> Email Found: ${userEmail}. Sending via Resend...`);
             
-            // Send Email
-            await sendReminderEmail(userEmail, nextCheckup.toLocaleDateString()); 
+            // Send Email via Axios/EmailJS
+            const success = await sendReminderEmail(userEmail, nextCheckup.toLocaleDateString()); 
+            
+            if (success) {
+                console.log(`        -> SUCCESS: Email sent to ${userEmail}`);
+                
+                // --- CRITICAL FIX: UPDATE DATABASE ---
+                // Ilipat ang date sa susunod na 6 months (o kahit anong logic mo)
+                // para hindi na siya ma-detect na "Overdue" sa susunod na run.
+                const { error: updateError } = await supabase
+                    .from('prescriptions')
+                    .update({ checkup_date: nextCheckup.toISOString() }) // Move date forward
+                    .eq('id', entry.id); // Gamitin ang ID ng prescription
 
-        } else {
-            console.log(`        -> Status: Not yet due.`);
+                if (updateError) {
+                    console.error("        -> DB ERROR: Failed to update checkup date", updateError);
+                } else {
+                    console.log("        -> DB UPDATED: Reminder set for next cycle.");
+                }
+
+            } else {
+                console.error(`        -> FAILED: EmailJS failed to send.`);
+            }
         }
     }
 }
 
-// Temporary: Run every minute for testing. Change to '0 9 * * *' for daily 9am later.
+// Temporary: Run every minute para ma-test agad
 cron.schedule('* * * * *', checkAndSendReminders);
 
-
-// --- MIDDLEWARE ---
+// --- Middleware to Verify User via Header ---
 const requireAuth = async (req, res, next) => {
     const userId = req.headers['user-id'];
     const userEmail = req.headers['user-email'];
@@ -219,7 +225,6 @@ const questionsPool = [
 ];
 
 // --- ROUTES ---
-
 // 1. Get Prescriptions
 app.get('/api/prescriptions', requireAuth, async (req, res) => {
     const { data, error } = await supabase
@@ -269,17 +274,17 @@ app.post('/api/assessment/submit', requireAuth, async (req, res) => {
     res.json({ flagged: isFlagged });
 });
 
-// 6. Root Route (Health Check)
+// 6. Supabase Redirect Handler (Serves index.html from public folder)
 app.get('/', (req, res) => {
     res.send("EyeGradeTracker Backend is Running!"); 
 });
 
-// 7. Endpoint for Changing Password
+// 7. Endpoint for Changing Password 
 app.put('/api/user/password', requireAuth, (req, res) => {
     res.status(200).json({ message: "Password update request received." });
 });
 
-// 8. Delete User and Associated Data
+// 8. Delete User and Associated Data (Requires AUTH and ADMIN KEY)
 app.delete('/api/user/delete-account', requireAuth, async (req, res) => {
     const userId = req.user.id;
     
@@ -305,19 +310,20 @@ app.delete('/api/user/delete-account', requireAuth, async (req, res) => {
     }
 });
 
-// 9. Send Checkup Reminder Email (Manual Trigger using Resend)
+// 9. Send Checkup Reminder Email 
 app.post('/api/send-reminder', requireAuth, async (req, res) => {
     const { email, next_checkup_date } = req.body;
     
-    // Call the new Resend function
+    // CHANGED: Use the EmailJS version of the function
     const success = await sendReminderEmail(email, next_checkup_date);
 
     if (!success) {
-        return res.status(500).json({ success: false, error: 'Failed to send email via Resend.' });
+        return res.status(500).json({ success: false, error: 'Failed to send email via EmailJS.' });
     }
 
     res.json({ success: true, message: 'Reminder email sent successfully.' });
 });
+
 
 app.listen(process.env.PORT, () => console.log(`Server running on port ${process.env.PORT}`));
 

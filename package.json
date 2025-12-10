@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@emailjs/nodejs": "^5.0.2",
     "@supabase/supabase-js": "^2.86.2",
     "body-parser": "^2.2.1",
     "cors": "^2.8.5",
