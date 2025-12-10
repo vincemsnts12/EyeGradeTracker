@@ -10,7 +10,7 @@ const app = express();
 app.use(express.json());
 
 app.use(cors({
-    origin: 'https://eyegradetracker.vercel.app', // Allow only your Vercel frontend
+    origin: 'https://eye-grade-tracker.vercel.app', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     allowedHeaders: ['Content-Type', 'user-id', 'user-email']
 }));
@@ -124,7 +124,6 @@ async function checkAndSendReminders() {
 }
 
 cron.schedule('* * * * *', checkAndSendReminders);
-// -------------------------------------------------------------
 
 // --- Middleware to Verify User via Header ---
 const requireAuth = async (req, res, next) => {
@@ -201,7 +200,6 @@ const questionsPool = [
 ];
 
 // --- ROUTES ---
-
 // 1. Get Prescriptions
 app.get('/api/prescriptions', requireAuth, async (req, res) => {
     const { data, error } = await supabase
@@ -253,10 +251,10 @@ app.post('/api/assessment/submit', requireAuth, async (req, res) => {
 
 // 6. Supabase Redirect Handler (Serves index.html from public folder)
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'public', 'index.html')); 
+    res.send("EyeGradeTracker Backend is Running!"); 
 });
 
-// 7. Endpoint for Changing Password (Frontend only needs to know this exists)
+// 7. Endpoint for Changing Password 
 app.put('/api/user/password', requireAuth, (req, res) => {
     res.status(200).json({ message: "Password update request received." });
 });
@@ -287,7 +285,7 @@ app.delete('/api/user/delete-account', requireAuth, async (req, res) => {
     }
 });
 
-// 9. Send Checkup Reminder Email (Client-Side Trigger - Ngayon ay gumagamit na ng Nodemailer)
+// 9. Send Checkup Reminder Email 
 app.post('/api/send-reminder', requireAuth, async (req, res) => {
     const { email, next_checkup_date } = req.body;
     

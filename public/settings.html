@@ -10,7 +10,6 @@
 </head>
 <body class="bg-gray-50 font-sans flex flex-col min-h-screen">
 
-    <!-- UPDATED NAV: Removed 'Graphs', Renamed 'Summary' to 'Dashboard' -->
     <nav class="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
             <div class="flex items-center gap-2">
@@ -30,7 +29,7 @@
     </nav>
 
     <div class="flex-grow container mx-auto p-6 max-w-2xl mt-8">
-        <!-- Header Sizing matched to Assessment/Flashcards -->
+        
         <div class="mb-6">
             <h1 class="text-2xl font-bold text-black mb-1">Account Settings</h1>
             <p class="text-gray-500 text-sm">Manage your password and security preferences.</p>
@@ -38,9 +37,8 @@
         
         <p id="statusMsg" class="text-sm font-bold text-center mb-6 hidden p-3 rounded-lg"></p>
 
-        <!-- PASSWORD SECTION (Fixed red border) -->
         <section class="bg-white p-8 rounded-2xl shadow-xl border border-gray-100 mb-8 relative overflow-hidden">
-            <!-- Left Border Strip changed to Red-900 for consistency -->
+            
             <div class="absolute top-0 left-0 w-1.5 h-full bg-red-900"></div>
             
             <h2 class="text-lg font-bold text-gray-800 mb-6">Change Password</h2>
@@ -67,7 +65,6 @@
             </div>
         </section>
 
-        <!-- DANGER ZONE -->
         <section class="bg-red-50 p-8 rounded-2xl border border-red-100 relative overflow-hidden">
             <h2 class="text-lg font-bold text-red-900 mb-3">Danger Zone</h2>
             <p class="text-sm text-red-800 mb-6 opacity-80 leading-relaxed">Permanently delete your account and all associated data. This action cannot be undone.</p>
@@ -80,7 +77,6 @@
 
     </div>
     
-    <!-- MODALS (Unchanged logic) -->
     <div id="passConfirmModal" style="display: none;" class="fixed inset-0 bg-gray-900 bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50">
         <div class="bg-white p-8 rounded-2xl shadow-2xl max-w-sm w-full">
             <h3 class="text-lg font-bold mb-3 text-gray-800">Confirm Change</h3>
@@ -177,7 +173,7 @@
         confirmDeleteBtn.addEventListener('click', async () => {
             closeModal('deleteConfirmModal');
             deleteAccountBtn.innerText = 'Deleting...'; deleteAccountBtn.disabled = true;
-            const apiUrl = 'http://localhost:3000/api/user/delete-account';
+            const apiUrl = `${API_URL}/user/delete-account`;
             
             try {
                 const response = await fetch(apiUrl, { method: 'DELETE', headers: getHeaders() });

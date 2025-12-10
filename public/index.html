@@ -11,7 +11,6 @@
     <style>
         body { font-family: 'Plus Jakarta Sans', sans-serif; }
         .input-transition { transition: all 0.2s ease-in-out; }
-        /* Smooth fade for modal */
         .modal-enter { animation: fadeIn 0.3s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
     </style>
@@ -111,18 +110,15 @@
 
     <script src="js/app.js"></script> 
     <script>
-        // --- 1. SETUP VARIABLES ---
         const checkboxes = document.querySelectorAll('.chk');
         const agreeBtn = document.getElementById('agreeBtn');
         const modal = document.getElementById('privacyModal');
         const loginBtn = document.getElementById('loginBtn');
         const errorMsg = document.getElementById('errorMsg');
-        // NEW VARIABLES
         const resendMsg = document.getElementById('resendMsg');
         const resendLink = document.getElementById('resendLink');
 
 
-        // --- 2. PRIVACY MODAL LOGIC ---
         checkboxes.forEach(c => c.addEventListener('change', () => {
             const allChecked = Array.from(checkboxes).every(box => box.checked);
             agreeBtn.disabled = !allChecked;
@@ -138,13 +134,11 @@
             const { data: { user } } = await supabase.auth.getUser();
 
             if (user) {
-                // Save acceptance to DB
                 await supabase.auth.updateUser({ data: { terms_accepted: true } });
                 window.location.href = 'summary.html';
             }
         });
         
-        // --- NEW: RESEND LINK LOGIC (FIXED REDIRECT) ---
         resendLink.addEventListener('click', async (e) => {
             e.preventDefault();
             const email = document.getElementById('email').value;
@@ -161,7 +155,7 @@
             const { error } = await supabase.auth.resend({
                 type: 'signup',
                 email: email,
-                redirectTo: 'https://eyegradetracker.onrender.com' 
+                redirectTo: 'https://eye-grade-tracker.vercel.app/'
             });
 
             if (error) {
@@ -172,13 +166,12 @@
         });
 
 
-        // --- 3. LOGIN LOGIC ---
         loginBtn.addEventListener('click', async () => {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
             
             errorMsg.classList.add('hidden');
-            resendMsg.classList.add('hidden'); // Clear resend message on new login attempt
+            resendMsg.classList.add('hidden'); 
             const originalText = loginBtn.innerText;
             loginBtn.innerText = "Checking...";
             loginBtn.disabled = true;
@@ -189,10 +182,9 @@
             });
 
             if (error) {
-                // LOGIC UPDATE: Check kung unverified email
                 if (error.message.includes("Email not confirmed")) {
                     errorMsg.innerText = "Please verify your email via the link sent to your inbox.";
-                    resendMsg.classList.remove('hidden'); // SHOW RESEND LINK
+                    resendMsg.classList.remove('hidden'); 
                 } else {
                     errorMsg.innerText = "Invalid email or password.";
                 }
@@ -205,21 +197,17 @@
             }
         });
 
-        // --- 4. SESSION CHECK (Ghost Session Fix included) ---
         async function checkSession() {
             const { data } = await supabase.auth.getSession();
             const localUser = localStorage.getItem('eye_user');
 
-            // Logic: Papasukin lang kung may Session AND may LocalStorage data
             if (data.session && localUser) {
                 handleSuccessfulLogin(data.session.user);
             } else if (data.session && !localUser) {
-                // Kung may session sa server pero walang local data (meaning nag-logout), kill session.
                 await supabase.auth.signOut(); 
             }
         }
 
-        // --- 5. MAIN HANDLER ---
         function handleSuccessfulLogin(user) {
             localStorage.setItem('eye_user', JSON.stringify({
                 id: user.id,
