@@ -180,7 +180,7 @@
         // Load Profile Data
         async function fetchProfile() {
             try {
-                const res = await fetch(`${API_URL}/settings`, { headers: getHeaders() });
+                const res = await fetch(`${API_URL}/profile`, { headers: getHeaders() });
                 if (!res.ok) throw new Error("Failed to fetch profile");
                 
                 const data = await res.json();
@@ -207,7 +207,7 @@
             };
 
             try {
-                const res = await fetch(`${API_URL}/settings`, {
+                const res = await fetch(`${API_URL}/profile`, {
                     method: 'PUT',
                     headers: getHeaders(),
                     body: JSON.stringify(body)
