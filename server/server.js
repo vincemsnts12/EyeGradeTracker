@@ -4,7 +4,7 @@ const cors = require('cors');
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const cron = require('node-cron'); 
-const axios = require('axios'); // CHANGED: Replaced nodemailer with axios
+const axios = require('axios'); 
 
 const app = express();
 app.use(express.json());
@@ -15,10 +15,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'user-id', 'user-email']
 }));
 
-//app.use(express.static(path.join(__dirname, '..', 'public')));
-
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
+// --- SCHEDULER LOGIC (EmailJS via Axios) ---
 async function sendReminderEmail(email, nextCheckupDate) {
     console.log(`[EMAILJS] Preparing email for: ${email}`);
     
@@ -52,7 +51,6 @@ async function sendReminderEmail(email, nextCheckupDate) {
         </div>
     `;
 
-    // CHANGED: Construct EmailJS Payload
     const data = {
         service_id: process.env.EMAILJS_SERVICE_ID,
         template_id: process.env.EMAILJS_TEMPLATE_ID,
@@ -73,7 +71,6 @@ async function sendReminderEmail(email, nextCheckupDate) {
         console.error(`[EMAILJS FAILED] Error:`, error.response ? error.response.data : error.message);
         return false;
     }
-
 }
 
 async function checkAndSendReminders() {
@@ -102,7 +99,6 @@ async function checkAndSendReminders() {
         if (nextCheckup.getTime() <= today.getTime()) {
             console.log(`        -> STATUS: OVERDUE! User: ${entry.user_id}`);
             
-            // Fetch User Email
             const { data: user, error: userFetchError } = await supabase.auth.admin.getUserById(entry.user_id);
             
             if (userFetchError || !user || !user.user) {
@@ -112,7 +108,6 @@ async function checkAndSendReminders() {
             
             const userEmail = user.user.email;
             
-            // Send Email via Axios/EmailJS
             const success = await sendReminderEmail(userEmail, nextCheckup.toLocaleDateString()); 
             
             if (success) {
@@ -135,7 +130,7 @@ async function checkAndSendReminders() {
     }
 }
 
-
+// Run every minute
 cron.schedule('* * * * *', checkAndSendReminders);
 
 // --- Middleware to Verify User via Header ---
@@ -147,7 +142,6 @@ const requireAuth = async (req, res, next) => {
         return res.status(401).json({ error: 'Unauthorized' });
     }
     
-    // Strict TUP Domain Check
     if (!userEmail.endsWith('@tup.edu.ph')) {
         return res.status(403).json({ error: 'Restricted to @tup.edu.ph accounts only' });
     }
@@ -156,7 +150,7 @@ const requireAuth = async (req, res, next) => {
     next();
 };
 
-// --- DATA: Flashcards & Questions ---
+// --- DATA ---
 const flashcardsPool = [
     { title: "The 'Doomscroll'", content: "Staring at your phone in total darkness confuses your brain and strains eyes. Turn on a lamp!", ref: "Healthline" },
     { title: "Caffeine Twitch", content: "Eyelid twitching? You might have had too much coffee or not enough sleep. Cut back on the espresso.", ref: "Mayo Clinic" },
@@ -213,6 +207,7 @@ const questionsPool = [
 ];
 
 // --- ROUTES ---
+
 // 1. Get Prescriptions
 app.get('/api/prescriptions', requireAuth, async (req, res) => {
     const { data, error } = await supabase
@@ -236,7 +231,7 @@ app.post('/api/prescriptions', requireAuth, async (req, res) => {
     res.json({ message: "Saved successfully" });
 });
 
-// 3. Get Flashcards (Random 5 out of 30)
+// 3. Get Flashcards
 app.get('/api/flashcards', (req, res) => {
     const fullDeck = [...flashcardsPool]; 
     const shuffled = fullDeck.sort(() => 0.5 - Math.random());
@@ -244,7 +239,7 @@ app.get('/api/flashcards', (req, res) => {
     res.json(selectedTen);
 });
 
-// 4. Get Assessment (Random 10)
+// 4. Get Assessment
 app.get('/api/assessment', (req, res) => {
     const shuffled = [...questionsPool].sort(() => 0.5 - Math.random());
     res.json(shuffled.slice(0, 10));
@@ -262,53 +257,43 @@ app.post('/api/assessment/submit', requireAuth, async (req, res) => {
     res.json({ flagged: isFlagged });
 });
 
-// 6. Supabase Redirect Handler (Serves index.html from public folder)
+// 6. Root
 app.get('/', (req, res) => {
     res.send("EyeGradeTracker Backend is Running!"); 
 });
 
-// 7. Endpoint for Changing Password 
+// 7. Password
 app.put('/api/user/password', requireAuth, (req, res) => {
     res.status(200).json({ message: "Password update request received." });
 });
 
-// 8. Delete User and Associated Data (Requires AUTH and ADMIN KEY)
+// 8. Delete User
 app.delete('/api/user/delete-account', requireAuth, async (req, res) => {
     const userId = req.user.id;
-    
     try {
         const { error: logError } = await supabase.from('assessment_logs').delete().eq('user_id', userId);
         if (logError) throw logError;
-        
         const { error: presError } = await supabase.from('prescriptions').delete().eq('user_id', userId);
         if (presError) throw presError;
-        
         const { error: userError } = await supabase.auth.admin.deleteUser(userId);
-
         if (userError) {
             console.error("Supabase Admin Delete Error:", userError);
             return res.status(500).json({ error: 'Failed to delete user account.' });
         }
-
         res.json({ message: "Account successfully deleted." });
-
     } catch (err) {
         console.error("Server-side deletion error:", err);
         res.status(500).json({ error: `An internal error occurred during data cleanup: ${err.message}` });
     }
 });
 
-// 9. Send Checkup Reminder Email 
+// 9. Send Reminder
 app.post('/api/send-reminder', requireAuth, async (req, res) => {
     const { email, next_checkup_date } = req.body;
-    
-    // CHANGED: Use the EmailJS version of the function
     const success = await sendReminderEmail(email, next_checkup_date);
-
     if (!success) {
         return res.status(500).json({ success: false, error: 'Failed to send email via EmailJS.' });
     }
-
     res.json({ success: true, message: 'Reminder email sent successfully.' });
 });
 
@@ -329,7 +314,6 @@ app.get('/api/profile', requireAuth, async (req, res) => {
 
 // 11. Update User Profile (NAME & STUDENT NUMBER ONLY)
 app.put('/api/profile', requireAuth, async (req, res) => {
-    // Kuhanin lang ang Name at Student Number. IGNORE ang Section.
     const { full_name, student_number } = req.body;
 
     const { error } = await supabase
@@ -341,12 +325,9 @@ app.put('/api/profile', requireAuth, async (req, res) => {
     res.json({ message: "Profile updated successfully" });
 });
 
-
-app.listen(process.env.PORT, () => console.log(`Server running on port ${process.env.PORT}`));
-
+// Delete Prescription
 app.delete('/api/prescriptions/:id', requireAuth, async (req, res) => {
     const { id } = req.params;
-    
     const { error } = await supabase
         .from('prescriptions')
         .delete()
@@ -356,3 +337,5 @@ app.delete('/api/prescriptions/:id', requireAuth, async (req, res) => {
     if (error) return res.status(500).json({ error: error.message });
     res.json({ message: "Deleted successfully" });
 });
+
+app.listen(process.env.PORT || 3000, () => console.log(`Server running on port ${process.env.PORT || 3000}`));
