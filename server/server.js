@@ -21,11 +21,20 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 // --- SCHEDULER LOGIC ---
 const transporter = nodemailer.createTransport({
-    service: 'gmail', 
+    host: 'smtp.gmail.com',  // Gamitin ang explicit host
+    port: 465,               // Gamitin ang Port 465 (SSL)
+    secure: true,            // Dapat true kapag port 465
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
-    }
+    },
+    // Dagdag settings para iwas timeout
+    tls: {
+        rejectUnauthorized: false // Minsan kailangan ito sa cloud servers
+    },
+    connectionTimeout: 10000, // 10 seconds wait time
+    greetingTimeout: 10000,
+    socketTimeout: 10000
 });
 
 
