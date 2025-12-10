@@ -21,21 +21,22 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 // --- SCHEDULER LOGIC ---
 const transporter = nodemailer.createTransport({
-    service: 'gmail', // Gamitin ang built-in service para sa automatic settings
-    host: 'smtp.gmail.com',
-    port: 465,              // BAGUHIN: Gawing 465 (SSL) instead na 587
-    secure: true,           // BAGUHIN: Gawing TRUE kapag port 465
+    service: 'gmail', // Gamitin natin ito para automatic na ang host/port config
     auth: {
-        user: process.env.EMAIL_USER, 
-        pass: process.env.EMAIL_PASS  
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
     },
     tls: {
-        rejectUnauthorized: false // Fixes SSL certificate issues
+        rejectUnauthorized: false // Ignore certificate errors
     },
-    // Idagdag ang mga ito para hindi agad mag-timeout
+    // --- ITO ANG SUSI SA RENDER FIX ---
+    family: 4,              // Pilitin gumamit ng IPv4 (Madalas nagta-timeout ang IPv6 sa Render)
+    pool: true,             // Gumamit ng pooled connections para mas stable
+    maxConnections: 1,      // Isa-isa lang ang send para hindi ma-flag as spam
+    rateLimit: 1,           // Limitahan ang speed ng pag-send
     connectionTimeout: 10000, // 10 seconds timeout
-    greetingTimeout: 5000,    // 5 seconds wait for greeting
-    socketTimeout: 10000      // 10 seconds socket timeout
+    greetingTimeout: 5000,
+    socketTimeout: 10000
 });
 
 // Verify connection configuration
