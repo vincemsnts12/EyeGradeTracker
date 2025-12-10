@@ -27,6 +27,14 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 // Helper function to send the reminder email via EmailJS
 async function sendReminderEmail(email, nextCheckupDate) {
     console.log(`[EMAILJS] Preparing email for: ${email}`);
+    
+    // --- DEBUG LOGS (Burahin mo ito pag gumana na) ---
+    console.log("Check Env Vars:");
+    console.log("Service ID:", process.env.EMAILJS_SERVICE_ID);
+    console.log("Template ID:", process.env.EMAILJS_TEMPLATE_ID);
+    console.log("Public Key:", process.env.EMAILJS_PUBLIC_KEY);
+    console.log("Private Key exists?:", !!process.env.EMAILJS_PRIVATE_KEY); // Dapat TRUE
+    // ------------------------------------------------
 
     // Your HTML content remains exactly the same
     const emailHtmlContent = `
@@ -73,7 +81,6 @@ async function sendReminderEmail(email, nextCheckupDate) {
     };
 
     try {
-        // CHANGED: Send POST request to EmailJS API
         const response = await axios.post('https://api.emailjs.com/api/v1.0/email/send', data);
         console.log(`[EMAILJS SUCCESS] Status: ${response.status}`);
         return true;
@@ -81,6 +88,7 @@ async function sendReminderEmail(email, nextCheckupDate) {
         console.error(`[EMAILJS FAILED] Error:`, error.response ? error.response.data : error.message);
         return false;
     }
+
 }
 
 async function checkAndSendReminders() {
