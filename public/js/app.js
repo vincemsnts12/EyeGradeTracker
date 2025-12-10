@@ -1,4 +1,4 @@
-const API_URL = "http://localhost:3000/api";
+const API_URL = "https://eyegradetracker.onrender.com";
 
 const SUPABASE_URL = "https://rkztzzvfhgwztdjxhgbh.supabase.co"; 
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJrenR6enZmaGd3enRkanhoZ2JoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUwNzc4MDcsImV4cCI6MjA4MDY1MzgwN30.R83VEpHmOd_bkfm7-BNCDzTkYRzjb86_2KntzvVEpMo"; 

@@ -8,9 +8,14 @@ const nodemailer = require('nodemailer');
 
 const app = express();
 app.use(express.json());
-app.use(cors());
 
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(cors({
+    origin: 'https://eyegradetracker.vercel.app', // Allow only your Vercel frontend
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'user-id', 'user-email']
+}));
+
+//app.use(express.static(path.join(__dirname, '..', 'public')));
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
