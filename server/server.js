@@ -80,49 +80,67 @@ async function sendReminderEmail(email, nextCheckupDate) {
 }
 
 async function checkAndSendReminders() {
-   
-    console.log(`[CRON] Running final email debug check... ${new Date().toLocaleTimeString()}`);
+    console.log(`[DEBUG] 1. Cron Job Started at ${new Date().toISOString()}`);
     
+    // Check Database Connection & Data
     const { data: prescriptions, error: dbError } = await supabase
         .from('prescriptions')
         .select('user_id, checkup_date');
 
     if (dbError) {
-        console.error("[CRON ERROR] Failed to fetch prescriptions:", dbError);
+        console.error("[DEBUG] ERROR: Database Fetch Failed:", dbError);
+        return;
+    }
+
+    console.log(`[DEBUG] 2. Found ${prescriptions.length} prescriptions in DB.`);
+
+    if (prescriptions.length === 0) {
+        console.log("[DEBUG] Stopping. No prescriptions to check.");
         return;
     }
 
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to midnight
 
     for (const entry of prescriptions) {
+        // Log details of each entry being checked
         const lastCheckupDate = new Date(entry.checkup_date);
         const nextCheckup = new Date(lastCheckupDate);
         nextCheckup.setMonth(lastCheckupDate.getMonth() + 6); 
-        
-        const nextCheckupOnlyDate = new Date(nextCheckup.getFullYear(), nextCheckup.getMonth(), nextCheckup.getDate());
-        const todayOnlyDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        nextCheckup.setHours(0, 0, 0, 0);
 
-        if (nextCheckupOnlyDate <= todayOnlyDate) {
+        console.log(`[DEBUG] Checking User: ${entry.user_id}`);
+        console.log(`        - Last Checkup: ${lastCheckupDate.toLocaleDateString()}`);
+        console.log(`        - Due Date: ${nextCheckup.toLocaleDateString()}`);
+        console.log(`        - Today: ${today.toLocaleDateString()}`);
+
+        if (nextCheckup.getTime() <= today.getTime()) {
+            console.log(`        -> STATUS: OVERDUE! Attempting to fetch email...`);
             
-            // 1. Fetch the user email using Admin Client
+            // Fetch Email
             const { data: user, error: userFetchError } = await supabase.auth.admin.getUserById(entry.user_id);
             
-            if (userFetchError || !user.user) {
-                console.error(`  User Fetch Failed for ID: ${entry.user_id}. Error: ${userFetchError ? userFetchError.message : 'User not found'}`);
-                continue; // Skip email send
+            if (userFetchError || !user || !user.user) {
+                console.error(`        -> ERROR: User Fetch Failed for ID: ${entry.user_id}`, userFetchError);
+                continue;
             }
             
             const userEmail = user.user.email;
-            const formattedDate = nextCheckup.toLocaleDateString();
-
-            console.log(`  User Found: ${userEmail}`);
+            console.log(`        -> Email Found: ${userEmail}. Sending via Nodemailer...`);
             
-            // 2. Attempt to Send Email using Nodemailer
-            const success = await sendReminderEmail(userEmail, formattedDate); 
+            // Send Email
+            const success = await sendReminderEmail(userEmail, nextCheckup.toLocaleDateString()); 
+            
+            if (success) console.log(`        -> SUCCESS: Email sent to ${userEmail}`);
+            else console.error(`        -> FAILED: Nodemailer failed to send.`);
+
+        } else {
+            console.log(`        -> Status: Not yet due.`);
         }
     }
 }
 
+// Temporary: Run every minute para ma-test agad
 cron.schedule('* * * * *', checkAndSendReminders);
 
 // --- Middleware to Verify User via Header ---
