@@ -20,21 +20,19 @@ app.use(cors({
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
 
 // --- SCHEDULER LOGIC ---
+// BAGONG TRANSPORTER SETTINGS (Port 587)
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',  // Gamitin ang explicit host
-    port: 465,               // Gamitin ang Port 465 (SSL)
-    secure: true,            // Dapat true kapag port 465
+    host: 'smtp.gmail.com',
+    port: 587,              // Gamitin ang Port 587
+    secure: false,          // DAPAT FALSE kapag Port 587 (wag true)
+    requireTLS: true,       // Force secure connection after connect
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
     },
-    // Dagdag settings para iwas timeout
     tls: {
-        rejectUnauthorized: false // Minsan kailangan ito sa cloud servers
-    },
-    connectionTimeout: 10000, // 10 seconds wait time
-    greetingTimeout: 10000,
-    socketTimeout: 10000
+        rejectUnauthorized: false // Para iwas certificate errors sa cloud
+    }
 });
 
 
