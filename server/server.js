@@ -21,24 +21,33 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY
 
 // --- SCHEDULER LOGIC ---
 const transporter = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
+    service: 'gmail', // Gamitin ang built-in service setting
+    pool: true,       // Keep the connection open (iwas timeout sa handshake)
+    maxConnections: 1, // Isa-isang connection lang para hindi ma-flag
     auth: {
         user: process.env.EMAIL_USER, 
         pass: process.env.EMAIL_PASS  
     },
     tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false // Iwasan ang SSL certificate errors
     },
-    // ITO ANG SOLUSYON SA TIMEOUT:
-    family: 4 // Forces the code to use IPv4 instead of IPv6
+    // PINAKA-IMPORTANTE: Force IPv4
+    family: 4 
+});
+
+// Verify connection configuration
+transporter.verify(function (error, success) {
+    if (error) {
+        console.log('[MAIL SERVER ERROR] Cannot connect to Gmail:', error);
+    } else {
+        console.log('[MAIL SERVER READY] Server is ready to take our messages');
+    }
 });
 
 
 // Helper function to send the reminder email via Nodemailer
 async function sendReminderEmail(email, nextCheckupDate) {
-    console.log(`[CRON] Attempting to send reminder via Nodemailer to: ${email} for date ${nextCheckupDate}`);
+    console.log(`[NODEMAILER] Preparing email for: ${email}`);
 
     const mailOptions = {
         from: process.env.EMAIL_USER,
@@ -77,11 +86,12 @@ async function sendReminderEmail(email, nextCheckupDate) {
     };
 
     try {
-        await transporter.sendMail(mailOptions);
-        console.log(`STATUS: Nodemailer SUCCESSFULLY sent email.`);
+        const info = await transporter.sendMail(mailOptions);
+        console.log(`[NODEMAILER SUCCESS] Message ID: ${info.messageId}`);
         return true;
     } catch (error) {
-        console.error(`STATUS: Nodemailer SENDING FAILED (Error during send):`, error);
+        console.error(`[NODEMAILER FAILED] Error:`, error.message);
+        // Huwag natin i-throw ang error para hindi tumigil ang loop
         return false;
     }
 }
